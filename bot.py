@@ -6,46 +6,47 @@ import json
 from dotenv import load_dotenv
 from datetime import datetime, timedelta
 import time
+from translations import get_text, format_time
 
-# Charger les variables d'environnement
+# Load environment variables
 load_dotenv()
 
-# Configuration du bot
+# Bot configuration
 intents = discord.Intents.default()
 intents.message_content = True
 intents.guilds = True
 
 bot = commands.Bot(command_prefix='!', intents=intents)
 
-# Fichier de configuration pour stocker les cibles par serveur
+# Configuration file to store targets per server
 CONFIG_FILE = 'config.json'
 
-# Dictionnaire pour stocker les dernières utilisations de la commande par serveur
+# Dictionary to store last command usage per server
 # Format: {guild_id: timestamp}
 last_usage = {}
 
 def load_config():
-    """Charge la configuration depuis le fichier JSON"""
+    """Load configuration from JSON file"""
     if os.path.exists(CONFIG_FILE):
         with open(CONFIG_FILE, 'r') as f:
             return json.load(f)
     return {}
 
 def save_config(config):
-    """Sauvegarde la configuration dans le fichier JSON"""
+    """Save configuration to JSON file"""
     with open(CONFIG_FILE, 'w') as f:
         json.dump(config, f, indent=2)
 
 def get_target_user(guild_id):
-    """Récupère l'ID de l'utilisateur cible pour un serveur"""
+    """Get the target user ID for a server"""
     config = load_config()
     guild_config = config.get(str(guild_id))
     if isinstance(guild_config, dict):
         return guild_config.get('target_user')
-    return guild_config  # Ancien format (compatibilité)
+    return guild_config  # Old format (backward compatibility)
 
 def set_target_user(guild_id, user_id):
-    """Définit l'utilisateur cible pour un serveur"""
+    """Set the target user for a server"""
     config = load_config()
     if str(guild_id) not in config:
         config[str(guild_id)] = {}
@@ -53,30 +54,51 @@ def set_target_user(guild_id, user_id):
     save_config(config)
 
 def get_cooldown(guild_id):
-    """Récupère le cooldown configuré pour un serveur (en secondes)"""
+    """Get the configured cooldown for a server (in seconds)"""
     config = load_config()
     guild_config = config.get(str(guild_id))
     if isinstance(guild_config, dict):
-        return guild_config.get('cooldown', 60)  # 60 secondes par défaut
-    return 60  # 60 secondes par défaut
+        return guild_config.get('cooldown', 60)  # 60 seconds by default
+    return 60  # 60 seconds by default
 
 def set_cooldown(guild_id, cooldown_seconds):
-    """Définit le cooldown pour un serveur (en secondes)"""
+    """Set the cooldown for a server (in seconds)"""
     config = load_config()
     if str(guild_id) not in config:
         config[str(guild_id)] = {}
     elif not isinstance(config[str(guild_id)], dict):
-        # Migration: convertir l'ancien format (juste l'ID) en nouveau format
+        # Migration: convert old format (just ID) to new format
         old_target = config[str(guild_id)]
         config[str(guild_id)] = {'target_user': old_target}
     
     config[str(guild_id)]['cooldown'] = cooldown_seconds
     save_config(config)
 
+def get_language(guild_id):
+    """Get the configured language for a server"""
+    config = load_config()
+    guild_config = config.get(str(guild_id))
+    if isinstance(guild_config, dict):
+        return guild_config.get('language', 'en')  # English by default
+    return 'en'  # English by default
+
+def set_language(guild_id, language):
+    """Set the language for a server"""
+    config = load_config()
+    if str(guild_id) not in config:
+        config[str(guild_id)] = {}
+    elif not isinstance(config[str(guild_id)], dict):
+        # Migration: convert old format (just ID) to new format
+        old_target = config[str(guild_id)]
+        config[str(guild_id)] = {'target_user': old_target}
+    
+    config[str(guild_id)]['language'] = language
+    save_config(config)
+
 def check_cooldown(guild_id):
     """
-    Vérifie si la commande peut être utilisée sur le serveur
-    Retourne (can_use: bool, remaining_time: int)
+    Check if the command can be used on the server
+    Returns (can_use: bool, remaining_time: int)
     """
     cooldown_seconds = get_cooldown(guild_id)
     
@@ -93,200 +115,214 @@ def check_cooldown(guild_id):
     return False, remaining
 
 def set_last_usage(guild_id):
-    """Enregistre le timestamp de la dernière utilisation pour le serveur"""
+    """Record the timestamp of the last usage for the server"""
     last_usage[guild_id] = time.time()
 
 @bot.event
 async def on_ready():
-    """Événement déclenché quand le bot est prêt"""
-    print(f'✅ Bot connecté en tant que {bot.user.name} (ID: {bot.user.id})')
+    """Event triggered when the bot is ready"""
+    print(get_text(0, 'bot_connected', name=bot.user.name, id=bot.user.id))
     print('------')
     
     try:
-        # Synchroniser les commandes slash
+        # Sync slash commands
         synced = await bot.tree.sync()
-        print(f'✅ {len(synced)} commande(s) slash synchronisée(s)')
+        print(get_text(0, 'commands_synced', count=len(synced)))
     except Exception as e:
-        print(f'❌ Erreur lors de la synchronisation des commandes: {e}')
+        print(get_text(0, 'sync_error', error=e))
 
-@bot.tree.command(name="setcible", description="Définir l'utilisateur qui recevra les notifications (Admin seulement)")
-@app_commands.describe(utilisateur="L'utilisateur qui recevra les pings")
+@bot.tree.command(name="settarget", description="Set the user who will receive notifications (Admin only)")
+@app_commands.describe(user="The user who will receive the pings")
 @app_commands.checks.has_permissions(administrator=True)
-async def setcible(interaction: discord.Interaction, utilisateur: discord.Member):
+async def settarget(interaction: discord.Interaction, user: discord.Member):
     """
-    Commande pour définir l'utilisateur cible qui recevra les notifications
-    Réservée aux administrateurs
+    Command to set the target user who will receive notifications
+    Admin only
     """
     guild_id = interaction.guild.id
-    set_target_user(guild_id, utilisateur.id)
+    set_target_user(guild_id, user.id)
     
     await interaction.response.send_message(
-        f"✅ **{utilisateur.name}** est maintenant défini comme cible pour la commande /gorgeprofonde !",
+        get_text(guild_id, 'target_set', user=user.name),
         ephemeral=True
     )
 
-@bot.tree.command(name="setcooldown", description="Définir le cooldown de la commande /gorgeprofonde (Admin seulement)")
-@app_commands.describe(secondes="Durée du cooldown en secondes (minimum: 1, maximum: 86400)")
+@bot.tree.command(name="setcooldown", description="Set the cooldown for the /deepthroat command (Admin only)")
+@app_commands.describe(seconds="Cooldown duration in seconds (minimum: 1, maximum: 86400)")
 @app_commands.checks.has_permissions(administrator=True)
-async def setcooldown(interaction: discord.Interaction, secondes: int):
+async def setcooldown(interaction: discord.Interaction, seconds: int):
     """
-    Commande pour définir le cooldown de la commande /gorgeprofonde
-    Réservée aux administrateurs
+    Command to set the cooldown for the /deepthroat command
+    Admin only
     """
-    if secondes < 1:
+    if seconds < 1:
         await interaction.response.send_message(
-            "❌ Le cooldown doit être d'au moins 1 seconde.",
+            get_text(interaction.guild.id, 'cooldown_min_error'),
             ephemeral=True
         )
         return
     
-    if secondes > 86400:  # 24 heures max
+    if seconds > 86400:  # 24 hours max
         await interaction.response.send_message(
-            "❌ Le cooldown ne peut pas dépasser 86400 secondes (24 heures).",
+            get_text(interaction.guild.id, 'cooldown_max_error'),
             ephemeral=True
         )
         return
     
     guild_id = interaction.guild.id
-    set_cooldown(guild_id, secondes)
+    set_cooldown(guild_id, seconds)
     
-    # Formater le temps de manière lisible
-    if secondes < 60:
-        time_str = f"{secondes} seconde(s)"
-    elif secondes < 3600:
-        minutes = secondes // 60
-        secs = secondes % 60
-        time_str = f"{minutes} minute(s)" + (f" et {secs} seconde(s)" if secs > 0 else "")
-    else:
-        hours = secondes // 3600
-        minutes = (secondes % 3600) // 60
-        time_str = f"{hours} heure(s)" + (f" et {minutes} minute(s)" if minutes > 0 else "")
+    # Format time in a readable way
+    time_str = format_time(seconds, guild_id)
     
     await interaction.response.send_message(
-        f"✅ Le cooldown de la commande /gorgeprofonde est maintenant de **{time_str}** ({secondes}s).",
+        get_text(guild_id, 'cooldown_set', time_str=time_str, seconds=seconds),
         ephemeral=True
     )
 
-@bot.tree.command(name="viewcooldown", description="Afficher le cooldown actuel de la commande /gorgeprofonde")
+@bot.tree.command(name="viewcooldown", description="Display the current cooldown for the /deepthroat command")
 async def viewcooldown(interaction: discord.Interaction):
     """
-    Commande pour afficher le cooldown actuel configuré pour le serveur
+    Command to display the current configured cooldown for the server
     """
     guild_id = interaction.guild.id
     cooldown = get_cooldown(guild_id)
     
-    # Formater le temps de manière lisible
-    if cooldown < 60:
-        time_str = f"{cooldown} seconde(s)"
-    elif cooldown < 3600:
-        minutes = cooldown // 60
-        secs = cooldown % 60
-        time_str = f"{minutes} minute(s)" + (f" et {secs} seconde(s)" if secs > 0 else "")
-    else:
-        hours = cooldown // 3600
-        minutes = (cooldown % 3600) // 60
-        time_str = f"{hours} heure(s)" + (f" et {minutes} minute(s)" if minutes > 0 else "")
+    # Format time in a readable way
+    time_str = format_time(cooldown, guild_id)
     
     await interaction.response.send_message(
-        f"⏱️ Le cooldown actuel pour /gorgeprofonde est de **{time_str}** ({cooldown}s).",
+        get_text(guild_id, 'cooldown_current', time_str=time_str, seconds=cooldown),
         ephemeral=True
     )
 
-@bot.tree.command(name="gorgeprofonde", description="Envoie une notification privée à l'utilisateur cible")
-async def gorgeprofonde(interaction: discord.Interaction):
+@bot.tree.command(name="setlanguage", description="Set the bot language for this server (Admin only)")
+@app_commands.describe(language="Language (en for English, fr for French)")
+@app_commands.checks.has_permissions(administrator=True)
+async def setlanguage(interaction: discord.Interaction, language: str):
     """
-    Commande slash qui envoie un message privé à l'utilisateur cible configuré
-    pour l'informer qu'il a été pingé
+    Command to set the bot language for the server
+    Admin only
+    """
+    language = language.lower()
+    
+    if language not in ['en', 'fr']:
+        await interaction.response.send_message(
+            get_text(interaction.guild.id, 'language_invalid'),
+            ephemeral=True
+        )
+        return
+    
+    guild_id = interaction.guild.id
+    set_language(guild_id, language)
+    
+    language_name = "English" if language == 'en' else "Français"
+    
+    await interaction.response.send_message(
+        get_text(guild_id, 'language_set', language=language_name),
+        ephemeral=True
+    )
+
+async def handle_notification_command(interaction: discord.Interaction):
+    """
+    Common handler for notification commands
+    Sends a private message to the configured target user
     """
     author = interaction.user
     guild = interaction.guild
     channel = interaction.channel
     
-    # Vérifier le cooldown (par serveur)
+    # Check cooldown (per server)
     can_use, remaining = check_cooldown(guild.id)
     if not can_use:
-        # Formater le temps restant
-        if remaining < 60:
-            time_str = f"{remaining} seconde(s)"
-        elif remaining < 3600:
-            minutes = remaining // 60
-            secs = remaining % 60
-            time_str = f"{minutes} minute(s)" + (f" et {secs} seconde(s)" if secs > 0 else "")
-        else:
-            hours = remaining // 3600
-            minutes = (remaining % 3600) // 60
-            time_str = f"{hours} heure(s)" + (f" et {minutes} minute(s)" if minutes > 0 else "")
+        # Format remaining time
+        time_str = format_time(remaining, guild.id)
         
         await interaction.response.send_message(
-            f"⏱️ Cette commande est en cooldown pour le serveur. Attendez encore **{time_str}** avant de l'utiliser à nouveau.",
+            get_text(guild.id, 'cooldown_active', time_str=time_str),
             ephemeral=True
         )
         return
     
-    # Récupérer l'ID de l'utilisateur cible
+    # Get target user ID
     target_user_id = get_target_user(guild.id)
     
     if not target_user_id:
         await interaction.response.send_message(
-            "❌ Aucune cible n'a été définie pour ce serveur. Un administrateur doit utiliser `/setcible` d'abord.",
+            get_text(guild.id, 'no_target_set'),
             ephemeral=True
         )
         return
     
-    # Récupérer l'utilisateur cible
+    # Get target user
     try:
-        utilisateur = await guild.fetch_member(target_user_id)
+        user = await guild.fetch_member(target_user_id)
     except discord.NotFound:
         await interaction.response.send_message(
-            "❌ L'utilisateur cible n'est plus sur ce serveur. Un administrateur doit redéfinir la cible avec `/setcible`.",
+            get_text(guild.id, 'target_not_found'),
             ephemeral=True
         )
         return
     
     try:
-        # Créer un embed pour le message privé
+        # Create embed for the private message
         embed = discord.Embed(
-            title="📬 Vous avez été mentionné !",
-            description=f"**{author.name}** vous a pingé via /gorgeprofonde",
+            title=get_text(guild.id, 'mention_title'),
+            description=get_text(guild.id, 'mention_description', author=author.name),
             color=discord.Color.blurple(),
             timestamp=datetime.now()
         )
         
-        embed.add_field(name="🏠 Serveur", value=guild.name, inline=True)
-        embed.add_field(name="💬 Salon", value=f"#{channel.name}", inline=True)
-        embed.add_field(name="👤 Par", value=author.name, inline=False)
-        embed.set_footer(text=f"Serveur: {guild.name}")
+        embed.add_field(name=get_text(guild.id, 'mention_server'), value=guild.name, inline=True)
+        embed.add_field(name=get_text(guild.id, 'mention_channel'), value=f"#{channel.name}", inline=True)
+        embed.add_field(name=get_text(guild.id, 'mention_by'), value=author.name, inline=False)
+        embed.set_footer(text=f"{get_text(guild.id, 'mention_server')}: {guild.name}")
         
-        # Envoyer le message privé à l'utilisateur ciblé
-        await utilisateur.send(embed=embed)
+        # Send private message to target user
+        await user.send(embed=embed)
         
-        # Enregistrer l'utilisation de la commande pour le serveur
+        # Record command usage for the server
         set_last_usage(guild.id)
         
-        # Confirmer dans le salon (visible par tous)
+        # Confirm in the channel (visible to everyone)
         await interaction.response.send_message(
-            f"✅ **{author.name}** a pingé **{utilisateur.name}** via /gorgeprofonde ! 📬"
+            get_text(guild.id, 'mention_success', author=author.name, target=user.name)
         )
         
     except discord.Forbidden:
-        # L'utilisateur a désactivé les messages privés
+        # User has disabled private messages
         await interaction.response.send_message(
-            f"❌ Impossible d'envoyer un message privé à **{utilisateur.name}**. "
-            f"L'utilisateur a peut-être désactivé les messages privés."
+            get_text(guild.id, 'dm_forbidden', user=user.name)
         )
     except Exception as e:
-        # Autre erreur
-        print(f"Erreur lors de l'envoi du message privé: {e}")
+        # Other error
+        print(f"Error sending private message: {e}")
         await interaction.response.send_message(
-            f"❌ Une erreur s'est produite lors de l'envoi du message."
+            get_text(guild.id, 'general_error')
         )
 
-# Lancer le bot
+@bot.tree.command(name="deepthroat", description="Send a private notification to the target user")
+async def deepthroat(interaction: discord.Interaction):
+    """
+    Slash command that sends a private message to the configured target user
+    (English version)
+    """
+    await handle_notification_command(interaction)
+
+@bot.tree.command(name="gorgeprofonde", description="Envoie une notification privée à l'utilisateur cible")
+async def gorgeprofonde(interaction: discord.Interaction):
+    """
+    Slash command that sends a private message to the configured target user
+    (French version)
+    """
+    await handle_notification_command(interaction)
+
+# Run the bot
 if __name__ == "__main__":
     token = os.getenv('DISCORD_TOKEN')
     
     if not token:
-        print("❌ ERREUR: Le token Discord n'est pas défini dans le fichier .env")
+        print("❌ ERROR: Discord token is not defined in the .env file")
         exit(1)
     
     bot.run(token)
