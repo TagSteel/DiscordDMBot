@@ -118,7 +118,7 @@ def get_text(guild_id, key, **kwargs):
     Returns:
         Formatted translated text
     """
-    from bot import load_config
+    from app import load_config
     
     config = load_config()
     guild_config = config.get(str(guild_id), {})

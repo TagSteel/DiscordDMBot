@@ -46,7 +46,7 @@ Discord bot with slash commands to send private notifications to a designated us
 
 5. **Run the bot**
    ```bash
-   python bot.py
+   python app.py
    ```
 
 ## Usage
