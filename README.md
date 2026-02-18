@@ -2,6 +2,12 @@
 
 Discord bot with slash commands to send private notifications to a designated user.
 
+## Quick Start
+
+**➕ [Add GlouGlouBot to your Discord server](https://discord.com/oauth2/authorize?client_id=1473607008627200133&permissions=8&integration_type=0&scope=bot+applications.commands)**
+
+Click the link above to invite the bot to your server and start using it immediately!
+
 ## Features
 
 - **Multi-language support**: English (default) and French
