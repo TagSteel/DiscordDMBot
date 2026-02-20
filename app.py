@@ -15,6 +15,8 @@ load_dotenv()
 intents = discord.Intents.default()
 intents.message_content = True
 intents.guilds = True
+intents.presences = True
+intents.members = True
 
 bot = commands.Bot(command_prefix='!', intents=intents)
 
@@ -134,11 +136,16 @@ async def on_ready():
 @bot.tree.command(name="settarget", description="Set the user who will receive notifications (Admin only)")
 @app_commands.describe(user="The user who will receive the pings")
 @app_commands.checks.has_permissions(administrator=True)
+@app_commands.guild_only()
 async def settarget(interaction: discord.Interaction, user: discord.Member):
     """
     Command to set the target user who will receive notifications
     Admin only
     """
+    if interaction.guild is None:
+        await interaction.response.send_message("This command can only be used in a server.", ephemeral=True)
+        return
+
     guild_id = interaction.guild.id
     set_target_user(guild_id, user.id)
     
@@ -150,11 +157,16 @@ async def settarget(interaction: discord.Interaction, user: discord.Member):
 @bot.tree.command(name="setcooldown", description="Set the cooldown for the /deepthroat command (Admin only)")
 @app_commands.describe(seconds="Cooldown duration in seconds (minimum: 1, maximum: 86400)")
 @app_commands.checks.has_permissions(administrator=True)
+@app_commands.guild_only()
 async def setcooldown(interaction: discord.Interaction, seconds: int):
     """
     Command to set the cooldown for the /deepthroat command
     Admin only
     """
+    if interaction.guild is None:
+        await interaction.response.send_message("This command can only be used in a server.", ephemeral=True)
+        return
+
     if seconds < 1:
         await interaction.response.send_message(
             get_text(interaction.guild.id, 'cooldown_min_error'),
@@ -181,10 +193,15 @@ async def setcooldown(interaction: discord.Interaction, seconds: int):
     )
 
 @bot.tree.command(name="viewcooldown", description="Display the current cooldown for the /deepthroat command")
+@app_commands.guild_only()
 async def viewcooldown(interaction: discord.Interaction):
     """
     Command to display the current configured cooldown for the server
     """
+    if interaction.guild is None:
+        await interaction.response.send_message("This command can only be used in a server.", ephemeral=True)
+        return
+
     guild_id = interaction.guild.id
     cooldown = get_cooldown(guild_id)
     
@@ -199,11 +216,16 @@ async def viewcooldown(interaction: discord.Interaction):
 @bot.tree.command(name="setlanguage", description="Set the bot language for this server (Admin only)")
 @app_commands.describe(language="Language (en for English, fr for French)")
 @app_commands.checks.has_permissions(administrator=True)
+@app_commands.guild_only()
 async def setlanguage(interaction: discord.Interaction, language: str):
     """
     Command to set the bot language for the server
     Admin only
     """
+    if interaction.guild is None:
+        await interaction.response.send_message("This command can only be used in a server.", ephemeral=True)
+        return
+
     language = language.lower()
     
     if language not in ['en', 'fr']:
@@ -228,6 +250,10 @@ async def handle_notification_command(interaction: discord.Interaction):
     Common handler for notification commands
     Sends a private message to the configured target user
     """
+    if interaction.guild is None:
+        await interaction.response.send_message("This command can only be used in a server.", ephemeral=True)
+        return
+
     author = interaction.user
     guild = interaction.guild
     channel = interaction.channel
@@ -257,6 +283,19 @@ async def handle_notification_command(interaction: discord.Interaction):
     # Get target user
     try:
         user = await guild.fetch_member(target_user_id)
+        
+        # If the member is available in cache with presence info, prefer the cached member
+        cached_user = guild.get_member(target_user_id)
+        if cached_user is not None:
+            user = cached_user
+        
+        # Check if user is in Do Not Disturb mode
+        if user.status == discord.Status.dnd:
+            await interaction.response.send_message(
+                get_text(guild.id, 'user_dnd', user=user.name)
+            )
+            return
+            
     except discord.NotFound:
         await interaction.response.send_message(
             get_text(guild.id, 'target_not_found'),
@@ -302,6 +341,7 @@ async def handle_notification_command(interaction: discord.Interaction):
         )
 
 @bot.tree.command(name="deepthroat", description="Send a private notification to the target user")
+@app_commands.guild_only()
 async def deepthroat(interaction: discord.Interaction):
     """
     Slash command that sends a private message to the configured target user
@@ -310,6 +350,7 @@ async def deepthroat(interaction: discord.Interaction):
     await handle_notification_command(interaction)
 
 @bot.tree.command(name="gorgeprofonde", description="Envoie une notification privée à l'utilisateur cible")
+@app_commands.guild_only()
 async def gorgeprofonde(interaction: discord.Interaction):
     """
     Slash command that sends a private message to the configured target user
