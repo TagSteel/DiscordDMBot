@@ -32,6 +32,7 @@ Click the link above to invite the bot to your server and start using it immedia
    - Enable these intents in the Bot section:
      - SERVER MEMBERS INTENT
      - MESSAGE CONTENT INTENT
+     - PRESENCE INTENT
    - Copy the bot token
 
 2. **Install dependencies**

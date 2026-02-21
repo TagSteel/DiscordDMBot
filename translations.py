@@ -36,6 +36,7 @@ TRANSLATIONS = {
         'mention_by': "👤 By",
         'mention_success': "✅ **{author}** pinged **{target}** via /deepthroat! 📬",
         'dm_forbidden': "❌ Cannot send a private message to **{user}**. The user may have disabled private messages.",
+        'user_dnd': "❌ **{user}** is in Do Not Disturb mode and cannot be disturbed.",
         'general_error': "❌ An error occurred while sending the message.",
         
         # Time formatting
@@ -86,6 +87,7 @@ TRANSLATIONS = {
         'mention_by': "👤 Par",
         'mention_success': "✅ **{author}** a pingé **{target}** via /gorgeprofonde ! 📬",
         'dm_forbidden': "❌ Impossible d'envoyer un message privé à **{user}**. L'utilisateur a peut-être désactivé les messages privés.",
+        'user_dnd': "❌ **{user}** est en mode Ne Pas Déranger et ne peut pas être dérangé.",
         'general_error': "❌ Une erreur s'est produite lors de l'envoi du message.",
         
         # Time formatting
